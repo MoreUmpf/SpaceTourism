@@ -19,6 +19,8 @@ namespace SpaceTourism.Contracts
 		
 		public List<KerbalTourist> kerbalTourists = new List<KerbalTourist>();
 		
+		public static bool drawTouristList = true; //TODO: Export to Base SpaceTourism Assembly as CurrentScene-variable
+		
 		CelestialBody targetBody = Planetarium.fetch.Home;
 		int numberOfKerbals = 1;
 		int numberOfDays = 1;
@@ -59,6 +61,7 @@ namespace SpaceTourism.Contracts
 			recoverKerbal = (RecoverKerbal)AddParameter(new RecoverKerbal("Recover the Tourists"), null); //Bring the Tourists safely back to Kerbin
 			recoverKerbal.SetFunds(0f, 4000f);
 			recoverKerbal.SetReputation(0f, 10f);
+			recoverKerbal.Disable();
 			
 			touristDeaths = (TouristDeaths)AddParameter(new TouristDeaths(), null);
 			touristDeaths.DisableOnStateChange = false;
@@ -96,7 +99,7 @@ namespace SpaceTourism.Contracts
 				{
 					if (kerbalTourists.Exists(predicateAssigned))
 					{
-						messageFailure = "A Kerbal got killed during his vacation in space!       " +
+						messageFailure = "A Kerbal got killed during his vacation in space!\r\n" +
 										 "You need to recover the other Kerbals immediately to prevent additional penalties!";
 						//kerbalTourists.FindAll(predicateAssigned))	//<-- recover all Kerbals in this List
 						//TODO: Add Recovery Contract for penalty
@@ -105,12 +108,12 @@ namespace SpaceTourism.Contracts
 					else
 					{
 						if (kerbalTourists.Exists(predicateAvailable))
-							messageFailure = "A Kerbal got killed during his vacation in space!       " +
-											 "Kerbals all around Kerbin are now scared of space travel." +
+							messageFailure = "A Kerbal got killed during his vacation in space!\r\n" +
+											 "Kerbals all around Kerbin are now scared of space travel.\r\n" +
 											 "You won't be able to bring Kerbals to their space vacation for a while.";
 						else
-							messageFailure = "You killed a whole group of Kerbals during their vacation in space!" +
-											 "Kerbals all around Kerbin are now scared of space travel." +
+							messageFailure = "You killed a whole group of Kerbals during their vacation in space!\r\n" +
+											 "Kerbals all around Kerbin are now scared of space travel.\r\n" +
 											 "You won't be able to bring Kerbals to their space vacation for a while.";
 					}
 				}
@@ -119,7 +122,7 @@ namespace SpaceTourism.Contracts
 			{
 				if (kerbalTourists.Exists(predicateAssigned))
 				{
-					messageFailure = "You failed at flying your Kerbals to their vacation!    " +
+					messageFailure = "You failed at flying your Kerbals to their vacation!\r\n" +
 									 "You need to recover the remaining Kerbals immediately to prevent additional penalties!";
 					//kerbalTourists.FindAll(predicateAssigned))	//<-- recover all Kerbals in this List
 					//TODO: Add Recovery Contract for penalty
@@ -142,7 +145,9 @@ namespace SpaceTourism.Contracts
 		{
 			foreach(var kerbal in kerbalTourists)
 			{
-				HighLogic.CurrentGame.CrewRoster.Remove(kerbal.baseProtoCrewMember.name);
+				kerbal.baseProtoCrewMember.type = ProtoCrewMember.KerbalType.Unowned; //FIXME: Spams save with Unowned Kerbals after a while
+				// Dont remove them from the CrewRoster because if Tourist completes ProgressTracking-Node the ProgressTracking-Loader will look for the removed Kerbal and gives error
+				// HighLogic.CurrentGame.CrewRoster.Remove(kerbal.baseProtoCrewMember.name);
 			}
 			kerbalTourists.Clear();
 		}
@@ -151,7 +156,8 @@ namespace SpaceTourism.Contracts
 		{
 			foreach(var kerbal in kerbalTourists)
 			{
-				HighLogic.CurrentGame.CrewRoster.Remove(kerbal.baseProtoCrewMember.name);
+				kerbal.baseProtoCrewMember.type = ProtoCrewMember.KerbalType.Unowned; //FIXME: Spams save with Unowned Kerbals after a while
+				// HighLogic.CurrentGame.CrewRoster.Remove(kerbal.baseProtoCrewMember.name);
 			}
 			kerbalTourists.Clear();
 		}
@@ -230,6 +236,18 @@ namespace SpaceTourism.Contracts
             messageFailure = node.GetValue("messageFailure");
         }
         
+        protected override void OnRegister() //TODO: Export to Base SpaceTourism Assembly
+        {
+        	GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
+        	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
+        }
+        
+        protected override void OnUnregister()
+        {
+        	GameEvents.onGUIMissionControlSpawn.Remove(new EventVoid.OnEvent(OnMCSpawn));
+        	GameEvents.onGUIMissionControlDespawn.Remove(new EventVoid.OnEvent(OnMCDespawn));
+        }
+        
         protected override void OnSave(ConfigNode node)
         {
         	node.AddValue("targetBody", targetBody.flightGlobalsIndex);
@@ -263,6 +281,16 @@ namespace SpaceTourism.Contracts
         private static bool AvailableKerbal(KerbalTourist kerbal)
         {
         	return kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Available;
+        }
+        
+        private void OnMCSpawn()
+        {
+        	OrbitVacation.drawTouristList = false;
+        }
+        
+        private void OnMCDespawn()
+        {
+        	OrbitVacation.drawTouristList = true;
         }
     }
 }

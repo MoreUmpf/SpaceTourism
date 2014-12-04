@@ -55,7 +55,6 @@ namespace SpaceTourism.Contracts.Parameters
         
         private void TrackVessel() // Check if all tourists are in the same vessel and change the ParameterState if needed
         {
-        	Debug.Log("[TouristsTogether] TrackVessel Called!");
         	var firstTouristsSeat = (Parent.Parent as OrbitVacation).kerbalTourists.First().baseProtoCrewMember.seat; // Get the seat of the first tourist in the list
         	
         	foreach(var kerbal in (Parent.Parent as OrbitVacation).kerbalTourists)

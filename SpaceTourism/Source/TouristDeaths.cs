@@ -24,17 +24,6 @@ namespace SpaceTourism.Contracts.Parameters
         {
         	return "Don't kill any Tourists!";
         }
-        
-		protected override string GetNotes()
-		{
-			string notes = "List of Tourists       ";
-			foreach(var tourist in (Root as OrbitVacation).kerbalTourists)
-        	{
-        		if (tourist != null)
-        			notes += "- " + tourist.baseProtoCrewMember.name + "         ";
-        	}
-        	return notes;
-		}
 		
 		protected override string GetMessageFailed()
 		{
@@ -58,7 +47,6 @@ namespace SpaceTourism.Contracts.Parameters
 
         private void OnCrewKilled(EventReport report)
         {
-        	Debug.Log("[TouristDeaths] OnCrewKilled Called!");
             if (report.eventType == FlightEvents.CREW_KILLED)
             {
             	if (state != ParameterState.Failed)

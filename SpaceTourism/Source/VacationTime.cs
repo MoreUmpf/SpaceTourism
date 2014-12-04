@@ -23,7 +23,7 @@ namespace SpaceTourism.Contracts.Parameters
 		{			
 		}
 		
-		public VacationTime(CelestialBody body, int days, string[] luxuries)
+		public VacationTime(CelestialBody body, int days, string[] luxuries) //TODO: Implement luxuries
         {
             this.numberOfDays = days;
             this.targetBody = body;
@@ -41,6 +41,21 @@ namespace SpaceTourism.Contracts.Parameters
         	//TODO: Add Titles for different vacations(with/without luxuries ; in Orbit/on Surface ; at SpaceStation X/SurfaceBase Y)
         }
         
+        protected override string GetNotes()
+		{
+			if (OrbitVacation.drawTouristList)
+			{
+				string notes = "List of Tourists:";
+				foreach(var tourist in (Parent as OrbitVacation).kerbalTourists)
+	        	{
+	        		if (tourist != null)
+	        			notes += "\r\n- " + tourist.baseProtoCrewMember.name;
+	        	}
+	        	return notes;
+			}
+			return string.Empty;
+		}
+        
 		protected override void OnRegister()
 		{
 			GameEvents.Contract.onParameterChange.Add(new EventData<Contract, ContractParameter>.OnEvent(OnParameterChange));
@@ -51,14 +66,14 @@ namespace SpaceTourism.Contracts.Parameters
 			GameEvents.Contract.onParameterChange.Remove(new EventData<Contract, ContractParameter>.OnEvent(OnParameterChange));
 		}
 
-        protected override void OnSave (ConfigNode node)
+        protected override void OnSave(ConfigNode node)
         {
         	node.AddValue("numberOfDays", numberOfDays);
         	node.AddValue("targetBody", targetBody.flightGlobalsIndex);
         	node.AddValue("vacationIsRunning", vacationIsRunning);
         }
         
-        protected override void OnLoad (ConfigNode node)
+        protected override void OnLoad(ConfigNode node)
         {
 			numberOfDays = int.Parse(node.GetValue("numberOfDays"));
 			targetBody = FlightGlobals.Bodies.ElementAt(int.Parse(node.GetValue("targetBody")));
@@ -84,6 +99,8 @@ namespace SpaceTourism.Contracts.Parameters
 	        		else // If vacation is complete
 	        		{
 	        			SetComplete(); // Set paramter as complete
+	        			vacationIsRunning = false;
+	        			(Parent as OrbitVacation).GetParameter(typeof(RecoverKerbal)).Enable();
 	        		}
 	        	}
 	        	else
@@ -102,7 +119,6 @@ namespace SpaceTourism.Contracts.Parameters
         
         private bool vacMeetsRequirements()
         {
-        	Debug.Log("[VacationTime] vacMeetRequirements called!");
         	var firstTouristsSeat = (Parent as OrbitVacation).kerbalTourists.First().baseProtoCrewMember.seat; // Get the seat of the first tourist in the list
         	
         	if (firstTouristsSeat == null) // no seat = not in a vessel = requirements aren't met

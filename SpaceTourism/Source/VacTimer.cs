@@ -37,12 +37,12 @@ namespace SpaceTourism.Contracts.Parameters
         	return "Vacation is running!       Remaining time: " + timeDispay + " days";
         }
         
-        protected override void OnSave (ConfigNode node)
+        protected override void OnSave(ConfigNode node)
         {
         	node.AddValue("timeFinished", timeFinished);
         }
         
-        protected override void OnLoad (ConfigNode node)
+        protected override void OnLoad(ConfigNode node)
         {
         	timeFinished = double.Parse(node.GetValue("timeFinished"));
         }
