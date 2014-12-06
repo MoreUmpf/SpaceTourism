@@ -14,8 +14,6 @@ namespace SpaceTourism.Contracts.Parameters
 {
 	public class TouristDeaths : ContractParameter
 	{
-//		List<string> kerbalTourists = new List<string>();
-		
         protected override string GetHashString()
         {
         	return null;
@@ -40,9 +38,9 @@ namespace SpaceTourism.Contracts.Parameters
         	GameEvents.onCrewKilled.Remove(new EventData<EventReport>.OnEvent(OnCrewKilled));
         }
         
-        public void MarkAsComplete()
+        public new void SetComplete() // Change base-methods protection-level to public
         {
-        	SetComplete();
+        	base.SetComplete();
         }
 
         private void OnCrewKilled(EventReport report)
@@ -51,7 +49,7 @@ namespace SpaceTourism.Contracts.Parameters
             {
             	if (state != ParameterState.Failed)
             	{
-	            	foreach(var kerbal in (Parent as OrbitVacation).kerbalTourists)
+	            	foreach(var kerbal in (Parent as ITourismContract).KerbalTourists)
 	            	{
 	            		if (kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Dead)
 	            		{

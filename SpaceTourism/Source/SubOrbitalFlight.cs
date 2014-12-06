@@ -13,9 +13,9 @@ using SpaceTourism.Contracts.Parameters;
  
 namespace SpaceTourism.Contracts
 {
-	public class OrbitVacation : Contract, ITourismContract
+	public class SubOrbitalFlight : Contract, ITourismContract
 	{
-		public const int MAX_CONTRACTS = 3;
+		public const int MAX_CONTRACTS = 1;
 		
 		public static bool drawTouristList = true; //TODO: Export to Base SpaceTourism Assembly as CurrentScene-variable
 		
@@ -27,14 +27,6 @@ namespace SpaceTourism.Contracts
 			}
 		}
 		
-		public CelestialBody TargetBody
-		{
-			get
-			{
-				return targetBody;
-			}
-		}
-		
 		public int NumberOfKerbals
 		{
 			get
@@ -43,25 +35,33 @@ namespace SpaceTourism.Contracts
 			}
 		}
 		
-		public int NumberOfDays
+		public double MinApA
 		{
 			get
 			{
-				return numberOfDays;
+				return minApA;
+			}
+		}
+		
+		public double MaxApA
+		{
+			get
+			{
+				return maxApA;
 			}
 		}
 		
 		List<KerbalTourist> kerbalTourists = new List<KerbalTourist>();
-		CelestialBody targetBody = Planetarium.fetch.Home;
-		int numberOfKerbals = 1;
-		int numberOfDays = 1;
+		int numberOfKerbals;
+		double minApA;
+		double maxApA;
 		
-		VacationTime vacationTime;
+		ZeroG zeroG;
 		RecoverKerbal recoverKerbal;
 		TouristDeaths touristDeaths;
 		
-		ReachDestination reachDestination;
 		ReachSituation reachSituation;
+		ReachApoapsis reachApoapsis;
 		TouristsTogether touristsTogether;
 		
 		string messageFailure = "[no message found]";
@@ -72,21 +72,17 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			var bodies = Contract.GetBodies_Reached(true, true);
-        	if (bodies == null)
-				return false;	
-        	
         	UnityEngine.Random.seed = MissionSeed;
-        	numberOfKerbals = bodies.Count * (int)Math.Round(UnityEngine.Random.Range(1f, 2.6f));
-        	numberOfDays = (int)Math.Round(7f + UnityEngine.Random.Range(0f, 7f) * GameVariables.Instance.GetContractPrestigeFactor(Prestige));
-        	targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count() - 1)];
+        	numberOfKerbals = (int)Math.Round(UnityEngine.Random.Range(1f, 2.6f));
+        	minApA = Math.Round(UnityEngine.Random.Range(100000f, 150000f));
+        	maxApA = minApA + 5000;
         	
-            vacationTime = (VacationTime)AddParameter(new VacationTime(), null);
-            reachDestination = (ReachDestination)vacationTime.AddParameter(new ReachDestination(targetBody, string.Empty), null);
-            reachDestination.DisableOnStateChange = false;
-            reachSituation = (ReachSituation)vacationTime.AddParameter(new ReachSituation(Vessel.Situations.ORBITING, string.Empty), null); 
+            zeroG = (ZeroG)AddParameter(new ZeroG(), null);
+            reachSituation = (ReachSituation)zeroG.AddParameter(new ReachSituation(Vessel.Situations.SUB_ORBITAL, string.Empty), null); 
             reachSituation.DisableOnStateChange = false;
-            touristsTogether = (TouristsTogether)vacationTime.AddParameter(new TouristsTogether(), null);
+            reachApoapsis = (ReachApoapsis)zeroG.AddParameter(new ReachApoapsis(), null);
+            reachApoapsis.DisableOnStateChange = false;
+            touristsTogether = (TouristsTogether)zeroG.AddParameter(new TouristsTogether(), null);
             touristsTogether.DisableOnStateChange = false;
             
 			recoverKerbal = (RecoverKerbal)AddParameter(new RecoverKerbal("Recover the Tourists", RecoverKerbal.CompleteCondition.All, RecoverKerbal.CompleteCondition.Any), null); //Bring the Tourists safely back to Kerbin
@@ -101,10 +97,10 @@ namespace SpaceTourism.Contracts
 			touristDeaths.SetReputation(0f, 20f);
 			
 			SetExpiry();
-			SetScience(0f, targetBody);
-			SetDeadlineYears(1f, targetBody);
-			SetReputation(35f * numberOfKerbals * numberOfDays / 7, 32f * numberOfKerbals * numberOfDays / 7, targetBody);
-			SetFunds(6000f * numberOfKerbals * numberOfDays / 7, 14000f * numberOfKerbals * numberOfDays / 7, targetBody);  //TODO: Add numberOfDays to calculations
+			SetScience(0f, Planetarium.fetch.Home);
+			SetDeadlineYears(1f, Planetarium.fetch.Home);
+			SetReputation(35f * numberOfKerbals, 32f * numberOfKerbals, Planetarium.fetch.Home);
+			SetFunds(6000f * numberOfKerbals, 14000f * numberOfKerbals, Planetarium.fetch.Home);
             return true;
         }
 		
@@ -115,7 +111,6 @@ namespace SpaceTourism.Contracts
 				var kerbal = HighLogic.CurrentGame.CrewRoster.GetNewKerbal();
 				kerbalTourists.Add(new KerbalTourist(kerbal, KerbalTourist.KerbalState.NotReadyForVacation));
 				recoverKerbal.AddKerbal(kerbal.name);
-				Debug.Log("[OrbitVacation] Added Kerbaltourist: " + kerbal.name);
 			}
 			
 			
@@ -125,7 +120,7 @@ namespace SpaceTourism.Contracts
 		{	
 			if (touristDeaths.State == ParameterState.Failed)
 			{
-				System.Threading.Thread.Sleep(10000);
+				//wait 10sec
 				if (kerbalTourists.Exists(predicateDead))
 				{
 					if (kerbalTourists.Exists(predicateAssigned))
@@ -203,27 +198,27 @@ namespace SpaceTourism.Contracts
             return true;
         }
 
-        protected override string GetHashString()
+        protected override string GetHashString() //TODO: Add Base SpaceTourism Assembly for managing contract generation
         {
-        	if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() < MAX_CONTRACTS)
+        	if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() < MAX_CONTRACTS)
         	{
-        		return "OrbitVacation." + ContractSystem.Instance.GetCompletedContracts<OrbitVacation>().Count() 
-        						  + "." + ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count();
+        		return "SubOrbitalFlight." + ContractSystem.Instance.GetCompletedContracts<SubOrbitalFlight>().Count() 
+        						  + "." + ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count();
         	}
-        	return "OrbitVacation.0.0";
+        	return "SubOrbitalFlight.0.0";
         }
         
         protected override string GetTitle()
         {
         	if (numberOfKerbals == 1)
-        		return "Fly one Kerbal to vacation around " + targetBody.theName;
+        		return "Fly a Kerbal on a suborbital trajectory over Kerbin";
 
-        	return "Fly " + numberOfKerbals + " Kerbals to vacation around " + targetBody.theName;
+        	return "Fly " + numberOfKerbals + " Kerbals on a suborbital trajectory over Kerbin";
         }
         
         protected override string GetNotes()
         {
-			return "If the vacation is interrupted, a penalty contract for rescuing the remaining tourists will be imposed upon you!";
+			return "If the flight is interrupted, a penalty contract for rescuing the remaining tourists will be imposed upon you!";
         }
         
         protected override string GetDescription()
@@ -234,9 +229,9 @@ namespace SpaceTourism.Contracts
         protected override string GetSynopsys()
         {
             if (numberOfKerbals == 1)
-        		return "Fly one Kerbal to a " + numberOfDays + " day vacation in Orbit around " + targetBody.theName;
+        		return "Fly a Kerbal on a suborbital trajectory over Kerbin";
 
-        	return "Fly " + numberOfKerbals + " Kerbals to a " + numberOfDays + " day vacation in Orbit around " + targetBody.theName;
+        	return "Fly " + numberOfKerbals + " Kerbals on a suborbital trajectory over Kerbin";
         }
         
         protected override string MessageFailed()
@@ -251,10 +246,9 @@ namespace SpaceTourism.Contracts
 
         	return "You have succesfully made the dream of " + numberOfKerbals + " Kerbals come true";
         }
-        
+               
         protected override void OnSave(ConfigNode node)
         {
-        	node.AddValue("targetBody", targetBody.flightGlobalsIndex);
             foreach(var kerbal in kerbalTourists)
             {
             	if (kerbal != null)
@@ -262,21 +256,22 @@ namespace SpaceTourism.Contracts
             		kerbal.Save(node.AddNode("TOURIST"));
             	}
             }
-            node.AddValue("numberOfDays", numberOfDays);
             node.AddValue("numberOfKerbals", numberOfKerbals);
+            node.AddValue("minApA", minApA);
+            node.AddValue("maxApA", maxApA);
             node.AddValue("messageFailure", messageFailure);
         }
 
         protected override void OnLoad(ConfigNode node)
         {
-        	targetBody = FlightGlobals.Bodies.ElementAt(int.Parse(node.GetValue("targetBody")));
             foreach(var subNode in node.GetNodes("TOURIST"))
             {
             	kerbalTourists.Add(new KerbalTourist(subNode));
             }
-            numberOfDays = int.Parse(node.GetValue("numberOfDays"));
-            numberOfKerbals = int.Parse(node.GetValue("numberOfKerbals")); 
-			vacationTime = (VacationTime)GetParameter(typeof(VacationTime));			
+            numberOfKerbals = int.Parse(node.GetValue("numberOfKerbals"));
+            minApA = double.Parse(node.GetValue("minApA"));
+            maxApA = double.Parse(node.GetValue("maxApA"));
+			zeroG = (ZeroG)GetParameter(typeof(ZeroG));		
             recoverKerbal = (RecoverKerbal)GetParameter(typeof(RecoverKerbal));
             touristDeaths = (TouristDeaths)GetParameter(typeof(TouristDeaths));
             messageFailure = node.GetValue("messageFailure");
@@ -298,7 +293,7 @@ namespace SpaceTourism.Contracts
         {
 			return ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit");
         }
-        
+
         private void OnMCSpawn()
         {
         	OrbitVacation.drawTouristList = false;

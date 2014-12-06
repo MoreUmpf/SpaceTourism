@@ -21,11 +21,7 @@ namespace SpaceTourism.Contracts.Parameters
 		
 		public VacTimer()
 		{
-		}
-		
-		public VacTimer(int numberOfKerbinDays)
-		{
-			this.timeFinished = Planetarium.GetUniversalTime() + (double)(numberOfKerbinDays * KERBIN_SECONDS_PER_DAY);
+			this.timeFinished = Planetarium.GetUniversalTime() + (double)((Parent.Parent as OrbitVacation).NumberOfDays * KERBIN_SECONDS_PER_DAY);
 		}
 		
         protected override string GetHashString()

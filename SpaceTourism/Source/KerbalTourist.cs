@@ -75,5 +75,20 @@ namespace SpaceTourism
 			node.AddValue("name", baseProtoCrewMember.name);
 			node.AddValue("touristState", kerbalState);
 		}
+		
+		public static bool DeadKerbal(KerbalTourist kerbal)
+        {
+        	return kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Dead;
+        }
+        
+        public static bool AssignedKerbal(KerbalTourist kerbal)
+        {
+        	return kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Assigned;
+        }
+        
+        public static bool AvailableKerbal(KerbalTourist kerbal)
+        {
+        	return kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Available;
+        }
 	}
 }
