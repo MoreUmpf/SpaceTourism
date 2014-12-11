@@ -52,9 +52,9 @@ namespace SpaceTourism.Contracts
 		}
 		
 		List<KerbalTourist> kerbalTourists = new List<KerbalTourist>();
-		CelestialBody targetBody = Planetarium.fetch.Home;
-		int numberOfKerbals = 1;
-		int numberOfDays = 1;
+		CelestialBody targetBody;
+		int numberOfKerbals;
+		int numberOfDays;
 		
 		VacationTime vacationTime;
 		RecoverKerbal recoverKerbal;
@@ -126,9 +126,9 @@ namespace SpaceTourism.Contracts
 			if (touristDeaths.State == ParameterState.Failed)
 			{
 				System.Threading.Thread.Sleep(10000);
-				if (kerbalTourists.Exists(predicateDead))
+				if (kerbalTourists.Any(kerbal => kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Dead))
 				{
-					if (kerbalTourists.Exists(predicateAssigned))
+					if (kerbalTourists.Any(kerbal => kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Assigned))
 					{
 						messageFailure = "A Kerbal got killed during his vacation in space!\r\n" +
 										 "You need to recover the other Kerbals immediately to prevent additional penalties!";
@@ -138,7 +138,7 @@ namespace SpaceTourism.Contracts
 					}
 					else
 					{
-						if (kerbalTourists.Exists(predicateAvailable))
+						if (kerbalTourists.Any(kerbal => kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Available))
 							messageFailure = "A Kerbal got killed during his vacation in space!\r\n" +
 											 "Kerbals all around Kerbin are now scared of space travel.\r\n" +
 											 "You won't be able to bring Kerbals to their space vacation for a while.";
@@ -151,7 +151,7 @@ namespace SpaceTourism.Contracts
 			}
 			else
 			{
-				if (kerbalTourists.Exists(predicateAssigned))
+				if (kerbalTourists.Any(kerbal => kerbal.baseProtoCrewMember.rosterStatus == ProtoCrewMember.RosterStatus.Assigned))
 				{
 					messageFailure = "You failed at flying your Kerbals to their vacation!\r\n" +
 									 "You need to recover the remaining Kerbals immediately to prevent additional penalties!";
