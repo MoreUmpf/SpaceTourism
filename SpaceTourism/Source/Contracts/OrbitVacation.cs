@@ -15,10 +15,6 @@ namespace SpaceTourism.Contracts
 {
 	public class OrbitVacation : Contract, ITourismContract
 	{
-		public const int MAX_CONTRACTS = 3;
-		
-		public static bool drawTouristList = true; //TODO: Export to Base SpaceTourism Assembly as CurrentScene-variable
-		
 		public List<KerbalTourist> KerbalTourists
 		{
 			get
@@ -50,7 +46,7 @@ namespace SpaceTourism.Contracts
 				return numberOfDays;
 			}
 		}
-		
+
 		List<KerbalTourist> kerbalTourists = new List<KerbalTourist>();
 		CelestialBody targetBody;
 		int numberOfKerbals;
@@ -65,13 +61,12 @@ namespace SpaceTourism.Contracts
 		TouristsTogether touristsTogether;
 		
 		string messageFailure = "[no message found]";
-		
-		Predicate<KerbalTourist> predicateDead = KerbalTourist.DeadKerbal;
-		Predicate<KerbalTourist> predicateAssigned = KerbalTourist.AssignedKerbal;
-		Predicate<KerbalTourist> predicateAvailable = KerbalTourist.AvailableKerbal;
 
 		protected override bool Generate()
 		{
+			if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() >= TourismContractManager.Instance.CurrentPhase.GetContractMaxCount<OrbitVacation>())
+				return false;
+			
 			var bodies = Contract.GetBodies_Reached(true, true);
         	if (bodies == null)
 				return false;	
@@ -205,12 +200,7 @@ namespace SpaceTourism.Contracts
 
         protected override string GetHashString()
         {
-        	if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() < MAX_CONTRACTS)
-        	{
-        		return "OrbitVacation." + ContractSystem.Instance.GetCompletedContracts<OrbitVacation>().Count() 
-        						  + "." + ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count();
-        	}
-        	return "OrbitVacation.0.0";
+        	return MissionSeed + DateAccepted.ToString();
         }
         
         protected override string GetTitle()
@@ -281,32 +271,12 @@ namespace SpaceTourism.Contracts
             touristDeaths = (TouristDeaths)GetParameter(typeof(TouristDeaths));
             messageFailure = node.GetValue("messageFailure");
         }
-        
-        protected override void OnRegister() //TODO: Export to Base SpaceTourism Assembly
-        {
-        	GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
-        }
-        
-        protected override void OnUnregister()
-        {
-        	GameEvents.onGUIMissionControlSpawn.Remove(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Remove(new EventVoid.OnEvent(OnMCDespawn));
-        }
 
         public override bool MeetRequirements()
         {
-			return ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit");
-        }
-        
-        private void OnMCSpawn()
-        {
-        	OrbitVacation.drawTouristList = false;
-        }
-        
-        private void OnMCDespawn()
-        {
-        	OrbitVacation.drawTouristList = true;
+        	if (TourismContractManager.Instance.CurrentPhase.ContractIsActive<OrbitVacation>() && ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        		return true;
+        	return false;
         }
     }
 }

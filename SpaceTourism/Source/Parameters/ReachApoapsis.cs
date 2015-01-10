@@ -30,7 +30,6 @@ namespace SpaceTourism.Contracts.Parameters
         	if (touristSeat == null)
         		return;
         	
-        	Debug.Log("Apoapsis: " + touristSeat.vessel.GetOrbit().ApA);
         	if (touristSeat.vessel.GetOrbit().ApA >= (Parent.Parent as SubOrbitalFlight).MinApA && touristSeat.vessel.GetOrbit().ApA <= (Parent.Parent as SubOrbitalFlight).MaxApA)
         		SetComplete();
         	else

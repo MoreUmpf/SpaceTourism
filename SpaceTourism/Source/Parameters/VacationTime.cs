@@ -29,7 +29,7 @@ namespace SpaceTourism.Contracts.Parameters
         
         protected override string GetNotes()
 		{
-			if (OrbitVacation.drawTouristList)
+			if (TourismContractManager.Instance.DrawTouristList)
 			{
 				string notes = "Tourists:";
 				foreach(var tourist in (Parent as OrbitVacation).KerbalTourists)

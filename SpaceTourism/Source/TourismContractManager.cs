@@ -12,117 +12,171 @@ using UnityEngine;
  
 namespace SpaceTourism
 {
-	[KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
-	public class TourismContractManager : Singleton<TourismContractManager>
-	{
-		protected TourismContractManager();
-		
-		public enum TourismPhases
+	[KSPScenario((ScenarioCreationOptions)96, new [] {
+		GameScenes.FLIGHT,
+		GameScenes.TRACKSTATION,
+		GameScenes.SPACECENTER,
+		GameScenes.EDITOR
+	})]
+	public class TourismContractManager : ScenarioModule
+	{	
+		public static TourismContractManager Instance
 		{
-			ZeroG,
-			Transition1,
-			Stations,
-			Transition2,
-			Bases,
-			Transition3,
-			Multi
+			get;
+			private set;
 		}
 		
-		public TourismPhases currentPhase;
+		public List<Type> PhaseTypes
+		{
+			get
+			{
+				return phaseTypes;
+			}
+		}
+		
+		public TourismPhase CurrentPhase
+		{
+			get
+			{
+				return currentPhase;
+			}
+			set
+			{
+				currentPhase = value;
+			}
+		}
+		
+		public bool DrawTouristList
+		{
+			get
+			{
+				return drawTouristList;
+			}
+		}
+		
+//		public enum TourismPhases
+//		{
+//			ZeroG,
+//			Transition1,
+//			Stations,
+//			Transition2,
+//			Bases,
+//			Transition3,
+//			Multi
+//		}
+		
+		List<Type> phaseTypes;
+		TourismPhase currentPhase;
+		
+		bool drawTouristList = true;
 		
 		List<ProtoVessel> existingHotels = new List<ProtoVessel>();
-		
-		private void Awake()
-		{
-			if (AssemblyLoader.loadedAssemblies.Any(assembly => assembly.name == "FinePrint"))
-			{
-				Debug.Log("[SpaceTourism] 'FinePrint' not installed! This mod needs 'FinePrint' to be installed in order to work properly!");
-				DestroyObject(this, 0f);
-			}
-			else
-				DontDestroyOnLoad(this);
-			
-			Debug.Log("[SpaceTourism ContractManager] Awaked!");
-		}
-		
-		private void Reset()
-		{
-			currentPhase = TourismPhases.ZeroG;
-			existingHotels.Clear();
-		}
 
-		private void Start()
+		public override void OnAwake()
 		{
-			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
-			GameEvents.onGameStateSave.Add(new EventData<ConfigNode>.OnEvent(OnSave));
-			GameEvents.onGameStateLoad.Add(new EventData<ConfigNode>.OnEvent(OnLoad));
+			Instance = this;
+			phaseTypes = AssemblyLoader.loadedTypes.FindAll(type => type.IsSubclassOf(typeof(TourismPhase)));
 			
-			Debug.Log("[SpaceTourism ContractManager] Started!");
+			foreach (var type in phaseTypes)
+			{
+				Debug.Log("[SpaceTourism] Loaded Type: " + type.Name);
+			}
+			
+			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
+			GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
+        	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
+			
+			Debug.Log("[SpaceTourism] Contract Manager initialized");
 		}
 
 		private void OnDestroy()
 		{
 			GameEvents.Contract.onCompleted.Remove(new EventData<Contract>.OnEvent(OnContractCompleted));
-			GameEvents.onGameStateSave.Remove(new EventData<ConfigNode>.OnEvent(OnSave));
-			GameEvents.onGameStateLoad.Remove(new EventData<ConfigNode>.OnEvent(OnLoad));
+			GameEvents.onGUIMissionControlSpawn.Remove(new EventVoid.OnEvent(OnMCSpawn));
+        	GameEvents.onGUIMissionControlDespawn.Remove(new EventVoid.OnEvent(OnMCDespawn));
 			
-			Debug.Log("[SpaceTourism ContractManager] Destroyed!");
+			Debug.Log("[SpaceTourism] Contract Manager destroyed");
 		}
 		
-		private void OnSave(ConfigNode node)
+		public override void OnSave(ConfigNode node)
 		{
-			node = node.AddNode("SPACETOURISM");
-			node.AddValue("currentPhase", currentPhase);
+			Debug.Log("[SpaceTourism] Saving TourismContractManager to node: " + node.name);
+			var nodePhase = node.AddNode("PHASE");
+			nodePhase.AddValue("name", currentPhase.GetType().Name);
+			currentPhase.Save(nodePhase);
+			
 			var nodeHotels = node.AddNode("HOTELS");
 			foreach (var hotel in existingHotels)
 			{
-				nodeHotels.AddValue("hotel", hotel.vesselID);
+				if (hotel != null)
+					nodeHotels.AddValue("hotel", hotel.vesselID);
 			}
 		}
 		
-		private void OnLoad(ConfigNode node)
+		public override void OnLoad(ConfigNode node)
 		{
-			node = node.GetNode("SPACETOURISM");
-			if (node == null)
-				return;
-			
-			currentPhase = (TourismPhases)((int)Enum.Parse(typeof(TourismPhases), node.GetValue("currentPhase")));
-			var nodeHotels = node.GetNode("HOTELS");
-			existingHotels.Clear();
-			foreach (var hotelID in nodeHotels.GetValues("hotel"))
+			if (node.HasNode("PHASE"))
 			{
-				existingHotels.Add(HighLogic.CurrentGame.flightState.protoVessels.Find(vessel => vessel.vesselID == hotelID));
+				var nodePhase = node.GetNode("PHASE");
+				var phaseName = nodePhase.GetValue("name");
+				
+				if (string.IsNullOrEmpty(phaseName))
+				{
+					currentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
+				}
+				else
+				{
+					currentPhase = (TourismPhase)Activator.CreateInstance(phaseTypes.Find(type => type.Name == phaseName));
+					currentPhase.Load(nodePhase);
+				}
+			}
+			else
+				currentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
+				
+			if (node.HasNode("HOTELS"))
+			{
+				foreach (var hotelID in node.GetNode("HOTELS").GetValues("hotel"))
+				{
+					existingHotels.Add(HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == hotelID));
+				}
 			}
 		}
+		
+		private void OnMCSpawn()
+        {
+        	drawTouristList = false;
+        }
+        
+        private void OnMCDespawn()
+        {
+        	drawTouristList = true;
+        }
 		
 		private void OnContractCompleted(Contract contract)
 		{
-			Debug.Log("[SpaceTourism ContractManager] Contract completed! Type: " + contract.GetType());
-			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract) || contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
+			Debug.Log("[SpaceTourism][ContractManager] Contract of type " + contract.GetType() + " has been completed!");
+			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract))
+			{
 				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
+				TourismEvents.onStationCompleted.Fire(FlightGlobals.ActiveVessel.protoVessel);
+			}
+			else if (contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
+			{
+				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
+				TourismEvents.onBaseCompleted.Fire(FlightGlobals.ActiveVessel.protoVessel);
+			}
 		}
 		
 		public ProtoVessel GetAvailableHotel(CelestialBody body, Vessel.Situations situation)
 		{
 			var basicStations = existingHotels.FindAll(vessel => VesselMeetsRequirements(vessel, body, situation));
-			var upgradedStations = basicStations.FindAll(vessel => vessel.protoPartSnapshots.Exists(part => part.modules.Exists(module => module.moduleName == "TourismModule")));
+			var upgradedStations = basicStations.FindAll(vessel => vessel.protoPartSnapshots.Any(part => part.modules.Any(module => module.moduleName == "TourismModule")));
 			
 			if (upgradedStations.Count == 0)
 				return basicStations.ElementAtOrDefault(UnityEngine.Random.Range(0, basicStations.Count - 1));
 			
-			return upgradedStations[UnityEngine.Random.Range(0, upgradedStations.Count - 1)];
+			return upgradedStations.ElementAtOrDefault(UnityEngine.Random.Range(0, upgradedStations.Count - 1));
 		}
-		
-//		public ProtoVessel GetAvailableBase(CelestialBody body)
-//		{
-//			var basicStations = existingHotels.FindAll(vessel => VesselMeetsRequirements(vessel, body, Vessel.Situations.LANDED));
-//			var upgradedStations = basicStations.FindAll(vessel => vessel.protoPartSnapshots.Exists(part => part.modules.Exists(module => module.moduleName == "TourismModule")));
-//			
-//			if (upgradedStations.Count == 0)
-//				return basicStations.ElementAtOrDefault(UnityEngine.Random.Range(0, basicStations.Count - 1));
-//			
-//			return upgradedStations.ElementAt(UnityEngine.Random.Range(0, upgradedStations.Count - 1));
-//		}
 		
 		private bool VesselMeetsRequirements(ProtoVessel protoVessel, CelestialBody body, Vessel.Situations situation)
 		{
@@ -134,12 +188,12 @@ namespace SpaceTourism
 			{
 				foreach (ProtoPartSnapshot part in protoVessel.protoPartSnapshots)
 				{
-					vesselHasAntenna |= part.modules.Exists(p => p.moduleName == "ModuleDataTransmitter" || p.moduleName == "ModuleLimitedDataTransmitter" || 
+					vesselHasAntenna |= part.modules.Any(p => p.moduleName == "ModuleDataTransmitter" || p.moduleName == "ModuleLimitedDataTransmitter" || 
 					                                        	 p.moduleName == "ModuleRTDataTransmitter" || p.moduleName == "ModuleRTAntenna");
-					vesselHasPowerGen |= part.modules.Exists(p => p.moduleName == "ModuleGenerator" || p.moduleName == "ModuleDeployableSolarPanel" || p.moduleName == "FNGenerator" || 
+					vesselHasPowerGen |= part.modules.Any(p => p.moduleName == "ModuleGenerator" || p.moduleName == "ModuleDeployableSolarPanel" || p.moduleName == "FNGenerator" || 
 					                                         	  p.moduleName == "FNAntimatterReactor" || p.moduleName == "FNNuclearReactor" || p.moduleName == "FNFusionReactor" || 
 					                                         	  p.moduleName == "KolonyConverter" || p.moduleName == "FissionGenerator" || p.moduleName == "ModuleCurvedSolarPanel");
-					vesselHasDockingPort |= part.modules.Exists(p => p.moduleName == "ModuleDockingNode");
+					vesselHasDockingPort |= part.modules.Any(p => p.moduleName == "ModuleDockingNode");
 					
 					if (vesselHasAntenna && vesselHasPowerGen && vesselHasDockingPort)
 						return true;

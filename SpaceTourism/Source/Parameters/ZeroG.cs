@@ -28,7 +28,7 @@ namespace SpaceTourism.Contracts.Parameters
         
         protected override string GetNotes()
 		{
-			if (SubOrbitalFlight.drawTouristList)
+			if (TourismContractManager.Instance.DrawTouristList)
 			{
 				string notes = "Tourists:";
 				foreach(var tourist in (Parent as SubOrbitalFlight).KerbalTourists)
@@ -38,7 +38,7 @@ namespace SpaceTourism.Contracts.Parameters
 	        	}
 	        	return notes;
 			}
-			return string.Empty;
+			return "\r\n \r\nTip: Reach the required Apoapsis before leaving the Atmosphere";
 		}
         
 		protected override void OnRegister()

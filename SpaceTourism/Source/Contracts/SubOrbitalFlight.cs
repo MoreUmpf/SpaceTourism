@@ -15,10 +15,6 @@ namespace SpaceTourism.Contracts
 {
 	public class SubOrbitalFlight : Contract, ITourismContract
 	{
-		public const int MAX_CONTRACTS = 1;
-		
-		public static bool drawTouristList = true; //TODO: Export to Base SpaceTourism Assembly as CurrentScene-variable
-		
 		public List<KerbalTourist> KerbalTourists
 		{
 			get
@@ -65,13 +61,12 @@ namespace SpaceTourism.Contracts
 		TouristsTogether touristsTogether;
 		
 		string messageFailure = "[no message found]";
-		
-		Predicate<KerbalTourist> predicateDead = KerbalTourist.DeadKerbal;
-		Predicate<KerbalTourist> predicateAssigned = KerbalTourist.AssignedKerbal;
-		Predicate<KerbalTourist> predicateAvailable = KerbalTourist.AvailableKerbal;
 
 		protected override bool Generate()
 		{
+			if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() >= TourismContractManager.Instance.CurrentPhase.GetContractMaxCount<SubOrbitalFlight>())
+				return false;
+			
         	UnityEngine.Random.seed = MissionSeed;
         	numberOfKerbals = (int)Math.Round(UnityEngine.Random.Range(1f, 2.6f));
         	minApA = Math.Round(UnityEngine.Random.Range(100000f, 150000f));
@@ -198,14 +193,9 @@ namespace SpaceTourism.Contracts
             return true;
         }
 
-        protected override string GetHashString() //TODO: Add Base SpaceTourism Assembly for managing contract generation
+        protected override string GetHashString()
         {
-        	if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() < MAX_CONTRACTS)
-        	{
-        		return "SubOrbitalFlight." + ContractSystem.Instance.GetCompletedContracts<SubOrbitalFlight>().Count() 
-        						  + "." + ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count();
-        	}
-        	return "SubOrbitalFlight.0.0";
+        	return MissionSeed + DateAccepted.ToString();
         }
         
         protected override string GetTitle()
@@ -252,10 +242,9 @@ namespace SpaceTourism.Contracts
             foreach(var kerbal in kerbalTourists)
             {
             	if (kerbal != null)
-            	{
             		kerbal.Save(node.AddNode("TOURIST"));
-            	}
             }
+            
             node.AddValue("numberOfKerbals", numberOfKerbals);
             node.AddValue("minApA", minApA);
             node.AddValue("maxApA", maxApA);
@@ -276,32 +265,14 @@ namespace SpaceTourism.Contracts
             touristDeaths = (TouristDeaths)GetParameter(typeof(TouristDeaths));
             messageFailure = node.GetValue("messageFailure");
         }
-        
-        protected override void OnRegister() //TODO: Export to Base SpaceTourism Assembly
-        {
-        	GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
-        }
-        
-        protected override void OnUnregister()
-        {
-        	GameEvents.onGUIMissionControlSpawn.Remove(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Remove(new EventVoid.OnEvent(OnMCDespawn));
-        }
 
         public override bool MeetRequirements()
         {
-			return ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit");
+        	if (TourismContractManager.Instance.CurrentPhase.ContractIsActive<SubOrbitalFlight>() && ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        		return true;
+        	return false;
         }
 
-        private void OnMCSpawn()
-        {
-        	OrbitVacation.drawTouristList = false;
-        }
         
-        private void OnMCDespawn()
-        {
-        	OrbitVacation.drawTouristList = true;
-        }
     }
 }
