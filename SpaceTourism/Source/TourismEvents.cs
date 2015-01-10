@@ -15,5 +15,7 @@ namespace SpaceTourism
 	public static class TourismEvents
 	{
 		public static EventData<KerbalTourist, KerbalTourist.KerbalState, KerbalTourist.KerbalState> onTouristStateChange = new EventData<KerbalTourist, KerbalTourist.KerbalState, KerbalTourist.KerbalState>("TouristStateChange");
+		public static EventData<ProtoVessel> onStationCompleted = new EventData<ProtoVessel>("StationCompleted");
+		public static EventData<ProtoVessel> onBaseCompleted = new EventData<ProtoVessel>("BaseCompleted");
 	}
 }
