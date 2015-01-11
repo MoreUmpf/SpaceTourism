@@ -15,12 +15,15 @@ namespace SpaceTourism.TourismPhases
 {
 	public class Stations : TourismPhase
 	{
-		public Stations()
+		protected override void OnAwake()
 		{
-			SetContractMaxCount<UpgradeHotel>(2);
+			contractMaxCounts.Add<UpgradeHotel>(2);
 			
 			nextPhase = typeof(Bases);
-			
+		}
+		
+		protected override void OnStart()
+		{
 			TourismEvents.onBaseCompleted.Add(new EventData<ProtoVessel>.OnEvent(OnBaseCompleted));
 		}
 		

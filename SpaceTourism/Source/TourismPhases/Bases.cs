@@ -15,13 +15,6 @@ namespace SpaceTourism.TourismPhases
 {
 	public class Bases : TourismPhase
 	{
-		public Bases()
-		{
-			//...
-			
-			nextPhase = typeof(Multi);
-		}
-		
 		//UNDONE: Not implemented
 	}
 }

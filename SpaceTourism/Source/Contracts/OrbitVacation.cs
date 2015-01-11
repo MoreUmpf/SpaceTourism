@@ -64,7 +64,8 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() >= TourismContractManager.Instance.CurrentPhase.GetContractMaxCount<OrbitVacation>())
+			if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() >= 
+			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<OrbitVacation>(false))
 				return false;
 			
 			var bodies = Contract.GetBodies_Reached(true, true);
@@ -274,7 +275,8 @@ namespace SpaceTourism.Contracts
 
         public override bool MeetRequirements()
         {
-        	if (TourismContractManager.Instance.CurrentPhase.ContractIsActive<OrbitVacation>() && ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        	if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<OrbitVacation>(false) > 0 && 
+        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
         		return true;
         	return false;
         }

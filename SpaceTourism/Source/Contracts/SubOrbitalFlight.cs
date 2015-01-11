@@ -64,7 +64,8 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() >= TourismContractManager.Instance.CurrentPhase.GetContractMaxCount<SubOrbitalFlight>())
+			if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() >= 
+			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<SubOrbitalFlight>(false))
 				return false;
 			
         	UnityEngine.Random.seed = MissionSeed;
@@ -268,7 +269,8 @@ namespace SpaceTourism.Contracts
 
         public override bool MeetRequirements()
         {
-        	if (TourismContractManager.Instance.CurrentPhase.ContractIsActive<SubOrbitalFlight>() && ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        	if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<SubOrbitalFlight>(false) > 0 && 
+        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
         		return true;
         	return false;
         }

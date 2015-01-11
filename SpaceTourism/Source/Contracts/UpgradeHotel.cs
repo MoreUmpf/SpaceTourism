@@ -48,7 +48,8 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<UpgradeHotel>().Count() >= TourismContractManager.Instance.CurrentPhase.GetContractMaxCount<UpgradeHotel>())
+			if (ContractSystem.Instance.GetCurrentContracts<UpgradeHotel>().Count() >= 
+			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<UpgradeHotel>(false))
 				return false;
 			
 			var bodies = Contract.GetBodies_Reached(true, false);
@@ -206,7 +207,10 @@ namespace SpaceTourism.Contracts
 
         public override bool MeetRequirements()
         {
-			return ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit");
+			if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<UpgradeHotel>(false) > 0 && 
+        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        		return true;
+        	return false;
         }
         
         private List<ProtoPartSnapshot> GetSpecialParts()

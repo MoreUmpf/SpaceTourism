@@ -26,14 +26,6 @@ namespace SpaceTourism
 			private set;
 		}
 		
-		public List<Type> PhaseTypes
-		{
-			get
-			{
-				return phaseTypes;
-			}
-		}
-		
 		public TourismPhase CurrentPhase
 		{
 			get
@@ -54,38 +46,25 @@ namespace SpaceTourism
 			}
 		}
 		
-//		public enum TourismPhases
-//		{
-//			ZeroG,
-//			Transition1,
-//			Stations,
-//			Transition2,
-//			Bases,
-//			Transition3,
-//			Multi
-//		}
-		
-		List<Type> phaseTypes;
 		TourismPhase currentPhase;
 		
 		bool drawTouristList = true;
 		
 		List<ProtoVessel> existingHotels = new List<ProtoVessel>();
 
+		~TourismContractManager()
+		{
+			OnDestroy();
+		}
+		
 		public override void OnAwake()
 		{
 			Instance = this;
-			phaseTypes = AssemblyLoader.loadedTypes.FindAll(type => type.IsSubclassOf(typeof(TourismPhase)));
-			
-			foreach (var type in phaseTypes)
-			{
-				Debug.Log("[SpaceTourism] Loaded Type: " + type.Name);
-			}
 			
 			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
 			GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
         	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
-			
+        	
 			Debug.Log("[SpaceTourism] Contract Manager initialized");
 		}
 
@@ -126,12 +105,14 @@ namespace SpaceTourism
 				}
 				else
 				{
-					currentPhase = (TourismPhase)Activator.CreateInstance(phaseTypes.Find(type => type.Name == phaseName));
+					currentPhase = (TourismPhase)Activator.CreateInstance(Globals.PhaseTypes.Find(type => type.Name == phaseName));
 					currentPhase.Load(nodePhase);
 				}
 			}
 			else
 				currentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
+			
+			currentPhase.Start();
 				
 			if (node.HasNode("HOTELS"))
 			{

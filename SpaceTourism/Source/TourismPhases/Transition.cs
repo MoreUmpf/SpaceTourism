@@ -19,26 +19,24 @@ namespace SpaceTourism.TourismPhases
 		List<Type> contractsToComplete = new List<Type>();
 		int contractsCompleted;
 		
-		public Transition()
+		public Transition(Type last, Type next)
 		{
-			skipTransition = true;
+			lastPhase = last;
+			nextPhase = next;
 			
-			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
+			MergeMaxCounts(last, next); // Set Transitions set of contracts to half the counts of the last and the next phase
+			contractsToComplete = contractMaxCounts.GetContractTypes();
+			
+			Awake();
 		}
 		
-		public Transition(TourismPhase last, Type next)
+		protected override void OnAwake()
 		{
-			lastPhase = last.GetType();
-			nextPhase = next;
 			skipTransition = true;
-			
-			// Create a temporary instance of the next phase to get access to its unique contract max counts
-			var tempPhase = (TourismPhase)Activator.CreateInstance(next);
-			tempPhase.Destroy(); // Destroy the temporary phase immediately to prevent it from doing anything
-			
-			SetContractMaxCounts(MergeMaxCounts(last, tempPhase)); // Set Transitions set of contracts to half the counts of the last and the next phase
-			contractsToComplete = tempPhase.GetContractMaxCounts().Keys.ToList();
-			
+		}
+		
+		protected override void OnStart()
+		{
 			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
 		}
 		
@@ -50,14 +48,13 @@ namespace SpaceTourism.TourismPhases
 		protected override void OnLoad(ConfigNode node)
 		{
 			var lastPhaseName = node.GetValue("lastPhase");
-			lastPhase = TourismContractManager.Instance.PhaseTypes.Find(type => type.Name == lastPhaseName);
+			lastPhase = Globals.PhaseTypes.Find(type => type.Name == lastPhaseName);
 			
 			var contractNames = node.GetValue("contractsToComplete").Split(", ".ToCharArray());
-			var contractTypes = AssemblyLoader.loadedTypes.FindAll(type => type.IsSubclassOf(typeof(ITourismContract)));
 			
 			foreach (var name in contractNames)
 			{
-				contractsToComplete.Add(contractTypes.Find(type => type.Name == name));
+				contractsToComplete.Add(Globals.ContractTypes.Find(type => type.Name == name));
 			}
 			
 			contractsCompleted = int.Parse(node.GetValue("contractsCompleted"));
@@ -68,7 +65,7 @@ namespace SpaceTourism.TourismPhases
 			node.AddValue("lastPhase", lastPhase.Name);
 			
 			string complete = string.Empty;
-			bool seperator;
+			bool seperator = false;
 			
 			foreach (var contractType in contractsToComplete)
 			{
@@ -83,17 +80,12 @@ namespace SpaceTourism.TourismPhases
 			node.AddValue("contractsCompleted", contractsCompleted);
 		}
 		
-		private Dictionary<Type, int> MergeMaxCounts(params TourismPhase[] phases)
+		private void MergeMaxCounts(params Type[] phases)
 		{
-			var result = new Dictionary<Type, int>();
 			foreach (var phase in phases)
 			{
-				foreach (var maxCount in phase.GetContractMaxCounts())
-				{
-					result.Add(maxCount.Key, (int)Math.Round(maxCount.Value / 2d)); //TODO: Make modifier configurable
-				}
+				contractMaxCounts.Add(ProtoList(phase), 0.5); //TODO: Make modifier configurable
 			}
-			return result;
 		}
 		
 		private void OnContractCompleted(Contract contract)

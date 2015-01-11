@@ -14,13 +14,16 @@ using SpaceTourism.Contracts;
 namespace SpaceTourism.TourismPhases
 {
 	public class ZeroGFlights : TourismPhase
-	{
-		public ZeroGFlights()
+	{	
+		protected override void OnAwake()
 		{
-			SetContractMaxCount<SubOrbitalFlight>(1);
+			contractMaxCounts.Add<SubOrbitalFlight>(1);
 			
 			nextPhase = typeof(Stations);
-			
+		}
+		
+		protected override void OnStart()
+		{
 			TourismEvents.onStationCompleted.Add(new EventData<ProtoVessel>.OnEvent(OnStationCompleted));
 		}
 		
