@@ -65,7 +65,6 @@ namespace SpaceTourism
 			}
 			set 
 			{
-				TourismEvents.onTouristStateChange.Fire(this, kerbalState, value);
 				kerbalState = value;
 			}
 		}
