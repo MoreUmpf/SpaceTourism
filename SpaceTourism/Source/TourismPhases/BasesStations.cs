@@ -13,8 +13,10 @@ using SpaceTourism.Contracts;
 
 namespace SpaceTourism.TourismPhases
 {
-	public class Multi : TourismPhase
+	public class BasesStations : TourismPhase
 	{
 		//UNDONE: Not Implemented
+		// Advances to MultipleDestinations upon reaching a specific amount of hotels with a specific complexity and having done atleast 2 vacation contracts
+		// Complexity of a hotel is defined by the number of the upgrades they have and their complexities
 	}
 }

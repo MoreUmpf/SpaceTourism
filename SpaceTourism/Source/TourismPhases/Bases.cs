@@ -15,6 +15,28 @@ namespace SpaceTourism.TourismPhases
 {
 	public class Bases : TourismPhase
 	{
-		//UNDONE: Not implemented
+		protected override void OnAwake()
+		{
+			ContractInfos.Add(new ContractInfo(typeof(UpgradeHotel), 2, 3, 2, 3));
+			
+			nextPhase = typeof(BasesStations);
+			skipTransition = true;
+		}
+		
+		protected override void OnStart()
+		{
+			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
+		}
+		
+		protected override void OnDestroy()
+		{
+			GameEvents.Contract.onCompleted.Remove(new EventData<Contract>.OnEvent(OnContractCompleted));
+		}
+		
+		private void OnContractCompleted(Contract contract)
+		{
+			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract))
+				Advance();
+		}
 	}
 }

@@ -17,24 +17,26 @@ namespace SpaceTourism.TourismPhases
 	{
 		protected override void OnAwake()
 		{
-			contractMaxCounts.Add<UpgradeHotel>(2);
+			ContractInfos.Add(new ContractInfo(typeof(UpgradeHotel), 2, 3, 2, 3));
 			
-			nextPhase = typeof(Bases);
+			nextPhase = typeof(BasesStations);
+			skipTransition = true;
 		}
 		
 		protected override void OnStart()
 		{
-			TourismEvents.onBaseCompleted.Add(new EventData<ProtoVessel>.OnEvent(OnBaseCompleted));
+			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
 		}
 		
 		protected override void OnDestroy()
 		{
-			TourismEvents.onBaseCompleted.Remove(new EventData<ProtoVessel>.OnEvent(OnBaseCompleted));
+			GameEvents.Contract.onCompleted.Remove(new EventData<Contract>.OnEvent(OnContractCompleted));
 		}
 		
-		private void OnBaseCompleted(ProtoVessel pvessel)
+		private void OnContractCompleted(Contract contract)
 		{
-			Advance();
+			if (contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
+				Advance();
 		}
 	}
 }
