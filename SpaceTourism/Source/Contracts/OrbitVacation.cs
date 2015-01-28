@@ -64,18 +64,26 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<OrbitVacation>().Count() >= 
-			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<OrbitVacation>(false))
+			var contractInfo = TourismPhase.ContractInfos.Find(info => info.Type == typeof(OrbitVacation));
+			
+			if (contractInfo == null)
+				return false;
+			
+			var currentContracts = ContractSystem.Instance.GetCurrentContracts<OrbitVacation>();
+			
+			if (currentContracts.Length >= contractInfo.OverallCount)
+				return false;
+			
+			if (currentContracts.Count(contract => contract.prestige == prestige) >= contractInfo.protoMaxCounts[prestige])
 				return false;
 			
 			var bodies = Contract.GetBodies_Reached(true, true);
         	if (bodies == null)
 				return false;	
         	
-        	UnityEngine.Random.seed = MissionSeed;
         	numberOfKerbals = bodies.Count * (int)Math.Round(UnityEngine.Random.Range(1f, 2.6f));
         	numberOfDays = (int)Math.Round(7f + UnityEngine.Random.Range(0f, 7f) * GameVariables.Instance.GetContractPrestigeFactor(Prestige));
-        	targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count() - 1)];
+        	targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count())];
         	
             vacationTime = (VacationTime)AddParameter(new VacationTime(), null);
             reachDestination = (ReachDestination)vacationTime.AddParameter(new ReachDestination(targetBody, string.Empty), null);
@@ -275,8 +283,7 @@ namespace SpaceTourism.Contracts
 
         public override bool MeetRequirements()
         {
-        	if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<OrbitVacation>(false) > 0 && 
-        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        	if (ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
         		return true;
         	return false;
         }

@@ -15,26 +15,39 @@ namespace SpaceTourism.TourismPhases
 {
 	public class ZeroGFlights : TourismPhase
 	{	
-		protected override void OnAwake()
+		public ZeroGFlights()
 		{
-			contractMaxCounts.Add<SubOrbitalFlight>(1);
+			ContractInfos.Add(new ContractInfo(typeof(SubOrbitalFlight), 3, 2, 1, 3));
 			
-			nextPhase = typeof(Stations);
+			nextPhase = typeof(Stations); // May change depending on what you build first
+			skipTransition = false;
 		}
 		
 		protected override void OnStart()
 		{
-			TourismEvents.onStationCompleted.Add(new EventData<ProtoVessel>.OnEvent(OnStationCompleted));
+			GameEvents.Contract.onCompleted.Add(OnContractCompleted);
+			
 		}
 		
 		protected override void OnDestroy()
 		{
-			TourismEvents.onStationCompleted.Remove(new EventData<ProtoVessel>.OnEvent(OnStationCompleted));
+			GameEvents.Contract.onCompleted.Remove(OnContractCompleted);
 		}
 		
-		private void OnStationCompleted(ProtoVessel pvessel)
+		private void OnContractCompleted(Contract contract)
 		{
-			Advance();
+			Debug.Log("[ZeroGFlights] OnContractCompleted called!");
+			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract))
+			{
+				nextPhase = typeof(Stations);
+				Advance();
+			}
+			else if (contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
+			{
+				nextPhase = typeof(Bases);
+				Advance();
+			}
+			Debug.Log("[ZeroGFlights] OnContractCompleted called! done");
 		}
 	}
 }

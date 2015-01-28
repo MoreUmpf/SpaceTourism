@@ -52,11 +52,13 @@ namespace SpaceTourism
 			}
 		}
 	}
+	
+	//TODO: Add debug log controller
 }
 
 namespace SpaceTourism.Contracts
 {
-	public interface ITourismContract
+	public interface ITourismContract //TODO: Create interfaces for upgrade contracts, vacation contracts, more
 	{
 		List<KerbalTourist> KerbalTourists
 		{

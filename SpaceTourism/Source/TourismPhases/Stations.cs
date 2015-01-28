@@ -15,9 +15,9 @@ namespace SpaceTourism.TourismPhases
 {
 	public class Stations : TourismPhase
 	{
-		protected override void OnAwake()
+		public Stations()
 		{
-			ContractInfos.Add(new ContractInfo(typeof(UpgradeHotel), 2, 3, 2, 3));
+			ContractInfos.Add(new ContractInfo(typeof(UpgradeHotel), 2, 3, 2, 3, ContractInfo.ContractRestriction.Orbital));
 			
 			nextPhase = typeof(BasesStations);
 			skipTransition = true;

@@ -13,338 +13,211 @@ using UnityEngine;
 namespace SpaceTourism
 {
 	public class TourismPhase
-	{	
-		public class MaxCountList
-		{		
-			List<Type> contractTypes = new List<Type>();
-			List<int> contractMaxCounts = new List<int>();
-			
-			List<Type> protoContractTypes = new List<Type>();
-			List<int> protoContractMaxCounts = new List<int>();
-			
-			public void Add(MaxCountList list)
+	{			
+		public class ContractInfo // Infos about maximum counts of contracts at different prestige levels
+		{
+			public enum ContractRestriction
 			{
-				Add(list, 1);
+				None,
+				Landed,
+				Orbital
 			}
 			
-			public void Add(MaxCountList list, double modifier)
+			public struct MaxCounts
 			{
-				for (int i = 0; i < list.protoContractTypes.Count; i++) 
+				public int Trivial, Significant, Exceptional;
+				
+				public int this[Contract.ContractPrestige prestige]
 				{
-					Add(list.protoContractTypes[i], (int)Math.Round(list.protoContractMaxCounts[i] * modifier), true);
-				}
-			}
-			
-			public void Add<T>(int maxCount) where T : Contract, Contracts.ITourismContract
-			{
-				Add(typeof(T), maxCount, true);
-			}
-			
-			public void Add(Type contract, int maxCount)
-			{
-				Add(contract, maxCount, true);
-			}
-			
-			private void Add(Type contract, int maxCount, bool proto)
-			{
-				if (IsValidTourismContract(contract) && maxCount > 0 && !protoContractTypes.Contains(contract))
-				{
-					if (proto)
+					get
 					{
-						protoContractTypes.Add(contract);
-						protoContractMaxCounts.Add(maxCount);
-					}
-					else
-					{
-						contractTypes.Add(contract);
-						contractMaxCounts.Add(maxCount);
-					}
-				}
-			}
-			
-			public void AddRange(Type[] contracts, int[] maxCounts)
-			{
-				AddRange(contracts, maxCounts, true);
-			}
-			
-			private void AddRange(Type[] contracts, int[] maxCounts, bool proto)
-			{
-				if (contracts.Length == maxCounts.Length)
-				{
-					for (int i = 0; i < contracts.Length; i++)
-					{
-						Add(contracts[i], maxCounts[i], proto);
-					}
-				}
-			}
-			
-			public void RemoveAt(int index)
-			{
-				RemoveAt(index, true);
-			}
-			
-			private void RemoveAt(int index, bool proto)
-			{
-				if (index != -1)
-				{
-					if (proto)
-					{
-						protoContractTypes.RemoveAt(index);
-						protoContractMaxCounts.RemoveAt(index);
-					}
-					else
-					{
-						contractTypes.RemoveAt(index);
-						contractMaxCounts.RemoveAt(index);
-					}
-				}
-			}
-			
-			public void Remove(Type contract)
-			{
-				Remove(contract, true);
-			}
-			
-			private void Remove(Type contract, bool proto)
-			{
-				RemoveAt(IndexOf(contract, proto), proto);
-			}
-			
-			public int IndexOf(Type contract, bool proto)
-			{
-				if (proto)
-					return protoContractTypes.IndexOf(contract);
-				
-				return contractTypes.IndexOf(contract);
-			}
-			
-			public int GetMaxCountAt(int index, bool proto)
-			{
-				if (index != -1)
-				{
-					if (proto)
-						return protoContractMaxCounts.ElementAt(index);
-					
-					return contractMaxCounts.ElementAt(index);
-				}
-				
-				return 0;
-			}
-			
-			public int GetMaxCount(Type contract, bool proto)
-			{
-				return GetMaxCountAt(IndexOf(contract, proto), proto);
-			}
-			
-			public int GetMaxCount<T>(bool proto) where T : Contract, Contracts.ITourismContract
-			{
-				return GetMaxCount(typeof(T), proto);
-			}
-			
-			public List<Type> GetContractTypes()
-			{
-				return protoContractTypes;
-			}
-			
-			public bool IsEmpty(bool proto)
-			{
-				if (proto)
-					return protoContractTypes.Count == 0;
-				
-				return contractTypes.Count == 0;
-			}
-			
-			public void SetMaxCount(Type contract, int maxCount)
-			{
-				SetMaxCount(contract, maxCount, true);
-			}
-			
-			private void SetMaxCount(Type contract, int maxCount, bool proto)
-			{
-				if (IsValidTourismContract(contract))
-					typeof(MaxCountList).GetMethod("SetMaxCount").MakeGenericMethod(contract).Invoke(this, new [] {(object)maxCount, (object)proto});
-			}
-				
-			public void SetMaxCount<T>(int maxCount) where T : Contract, Contracts.ITourismContract
-			{
-				SetMaxCount<T>(maxCount, true);
-			}
-			
-			private void SetMaxCount<T>(int maxCount, bool proto) where T : Contract, Contracts.ITourismContract
-			{
-				Remove(typeof(T), proto);
-				Add(typeof(T), maxCount, proto);
-				
-				if (!proto)
-					CorrectContractCount<T>(maxCount);
-			}
-			
-			public void ApplyChanges()
-			{
-				foreach (var contract in Globals.ContractTypes)
-				{
-					CorrectContractCount(contract, GetMaxCount(contract, true));
-				}
-				
-				contractTypes = protoContractTypes;
-				contractMaxCounts = protoContractMaxCounts;
-			}
-			
-			private void CorrectContractCount(Type contract, int maxCount)
-			{
-				if (IsValidTourismContract(contract))
-					typeof(MaxCountList).GetMethod("CorrectContractCount").MakeGenericMethod(contract).Invoke(this, new [] {(object)maxCount});
-			}
-			
-			private void CorrectContractCount<T>(int maxCount) where T : Contract, Contracts.ITourismContract
-			{
-				var activeContracts = ContractSystem.Instance.GetCurrentActiveContracts<T>();
-				var offeredContracts = ContractSystem.Instance.GetCurrentContracts<T>().Where(contract => contract.ContractState == Contract.State.Offered).ToList();
-				
-				while (offeredContracts.Count + activeContracts.Length > maxCount)
-				{
-					// Remove the lowest prestige contracts first
-					var toRemove = offeredContracts.FirstOrDefault(contract => (contract as Contract).Prestige == Contract.ContractPrestige.Trivial);
-					if (toRemove == null)
-					{
-						toRemove = offeredContracts.FirstOrDefault(contract => (contract as Contract).Prestige == Contract.ContractPrestige.Significant);
-						if (toRemove == null)
-						{
-							toRemove = offeredContracts.FirstOrDefault(contract => (contract as Contract).Prestige == Contract.ContractPrestige.Exceptional);
-							if (toRemove == null)
-								break; // When no offered contracts remain this loop will end (we don't remove active contracts)
-						}
-					}
+						if (prestige == Contract.ContractPrestige.Trivial)
+							return Trivial;
 						
-					offeredContracts.Remove(toRemove);
-					toRemove.Withdraw();
+						if (prestige == Contract.ContractPrestige.Significant)
+							return Significant;
+						
+						if (prestige == Contract.ContractPrestige.Exceptional)
+							return Exceptional;
+						
+						return 0;
+					}
+					set
+					{
+						if (prestige == Contract.ContractPrestige.Trivial)
+							Trivial = value;
+						
+						if (prestige == Contract.ContractPrestige.Significant)
+							Significant = value;
+						
+						if (prestige == Contract.ContractPrestige.Exceptional)
+							Exceptional = value;
+					}
 				}
 			}
 			
-			private bool IsValidTourismContract(Type contract)
+			public Type Type
 			{
-				if (contract != null && Globals.ContractTypes.Contains(contract))
-					return true;
+				get;
+				private set;
+			}
+			
+			public MaxCounts protoMaxCounts;
+			
+			public int OverallCount;
+			
+			public ContractRestriction Restriction;
+			
+			public ContractInfo(Type contract, int trivial, int significant, int exceptional, int overall, ContractRestriction restriction = ContractRestriction.None)
+			{
+				Type = contract;
+				protoMaxCounts.Trivial = trivial;
+				protoMaxCounts.Significant = significant;
+				protoMaxCounts.Exceptional = exceptional;
+				OverallCount = overall;
+				Restriction = restriction;
+			}
+			
+			public ContractInfo(ConfigNode.Value value)
+			{
+				Type = Globals.ContractTypes.Find(type => type.Name == value.name);
 				
-				Debug.LogError("[SpaceTourism] Contract " + contract.Name + " is not a valid tourism contract!");
-				return false;
+				var maxCounts = value.value.Split(", ".ToCharArray());
+				protoMaxCounts.Trivial = int.Parse(maxCounts[0]);
+				protoMaxCounts.Significant = int.Parse(maxCounts[2]);
+				protoMaxCounts.Exceptional = int.Parse(maxCounts[4]);
+				OverallCount = int.Parse(maxCounts[6]);
+				Restriction = (ContractRestriction)Enum.Parse(typeof(ContractRestriction), maxCounts[8]);
 			}
 			
-			public void Save(ConfigNode node)
+			public void WithdrawSurplusContracts()
 			{
-				for (int i = 0; i < protoContractTypes.Count; i++) 
+				var allContracts = ContractSystem.Instance.Contracts.FindAll(contract => contract.GetType() == Type);
+				var offeredContracts = allContracts.FindAll(contract => contract.ContractState == Contract.State.Offered);
+				
+				// Withdraw according to the overall count
+				var toRemove = offeredContracts.Take(Mathf.Clamp(allContracts.Count - OverallCount, 0, offeredContracts.Count));
+				
+				foreach (var contract in toRemove)
 				{
-					node.AddValue(protoContractTypes[i].Name, protoContractMaxCounts[i]);
+					allContracts.Remove(contract);
+					offeredContracts.Remove(contract);
+					contract.Withdraw();
+				}
+						
+				// Withdraw according to prestige counts
+				foreach (var prestige in (Contract.ContractPrestige[])Enum.GetValues(typeof(Contract.ContractPrestige)))
+				{
+					int removeCount = allContracts.FindAll(contract => contract.Prestige == prestige).Count - protoMaxCounts[prestige];
+					var targetContracts = offeredContracts.FindAll(contract => contract.Prestige == prestige);
+					toRemove = targetContracts.Take(Mathf.Clamp(removeCount, 0, targetContracts.Count));
+					
+					foreach (var contract in toRemove)
+						contract.Withdraw();
 				}
 			}
 			
-			public void Load(ConfigNode node)
+			public void SaveInfo(ConfigNode node)
 			{
-				for (int i = 0; i < node.values.Count; i++)
-				{
-					SetMaxCount(Globals.ContractTypes.Find(type => type.Name == node.values[i].name), int.Parse(node.values[i].value), true);
-				}
+				node.AddValue(Type.Name, protoMaxCounts.Trivial + ", " +  protoMaxCounts.Significant + ", " +  protoMaxCounts.Exceptional + ", " +  OverallCount + ", " +  Restriction);
 			}
 		}
 		
-		public MaxCountList ContractMaxCounts
-		{
-			get
-			{
-				return contractMaxCounts;
-			}
-		}
-		
-		protected MaxCountList contractMaxCounts = new MaxCountList();
+		public static List<ContractInfo> ContractInfos = new List<ContractInfo>();
 
-		protected bool skipTransition;
-		protected Type nextPhase;
+		protected static bool skipTransition;
+		protected static Type nextPhase;
 		
-		public TourismPhase()
+		public static void Start()
 		{
-			Awake();
+//			TourismContractManager.Instance.StartCoroutine("Update");
+			TourismContractManager.Instance.CurrentPhase.OnStart();
+			Debug.Log("[SpaceTourism] TourismPhase " + TourismContractManager.Instance.CurrentPhase.GetType().Name + " started!");
 		}
 		
-		~TourismPhase()
+		public static void Destroy()
 		{
-			Destroy();
+			if (TourismContractManager.Instance.CurrentPhase != null)
+			{
+//				TourismContractManager.Instance.StopCoroutine("Update");
+				TourismContractManager.Instance.CurrentPhase.OnDestroy();
+				Debug.Log("[SpaceTourism] TourismPhase " + TourismContractManager.Instance.CurrentPhase.GetType().Name + " destroyed!");
+			}
 		}
 		
-		public static MaxCountList ProtoList(Type phase)
-		{
-			if (phase != null && Globals.PhaseTypes.Contains(phase))
-				return (MaxCountList)typeof(TourismPhase).GetMethod("ProtoList").MakeGenericMethod(phase).Invoke(null, new object[0]);
-			
-			Debug.LogError("[SpaceTourism] TourismPhase " + phase.Name + " is not a valid tourism phase!");
-			return null;
-		}
-		
-		public static MaxCountList ProtoList<T>() where T : TourismPhase, new()
-		{
-			return new T().contractMaxCounts;
-		}
-		
-		public void Awake()
-		{
-			OnAwake();
-			Debug.Log("[SpaceTourism] TourismPhase " + GetType().Name + " is now awake!");
-		}
-		
-		public void Start()
-		{
-			contractMaxCounts.ApplyChanges();
-			TourismContractManager.Instance.StartCoroutine("Update");
-			OnStart();
-		}
-		
-		public void Destroy()
-		{
-			TourismContractManager.Instance.StopCoroutine("Update");
-			OnDestroy();
-		}
-		
-		private void Update()
+		private static void Update()
 		{
 			bool stop = false;
 			while (!stop)
-				stop = OnUpdate();
+				stop = TourismContractManager.Instance.CurrentPhase.OnUpdate();
 		}
 		
-		protected void Advance()
+		protected static void Advance()
 		{
 			if (skipTransition)
 			{
-				TourismContractManager.Instance.CurrentPhase = (TourismPhase)Activator.CreateInstance(nextPhase);
+				// Create the next phase and withdraw all remaining surplus contracts from the old phase
+				TourismContractManager.Instance.CurrentPhase = ActivateNextPhase();
 			}
 			else
 			{
-				TourismContractManager.Instance.CurrentPhase = new TourismPhases.Transition(GetType(), nextPhase); //TODO: Make configurable
+				TourismContractManager.Instance.CurrentPhase = new TourismPhases.Transition();
 			}
 			
-			TourismContractManager.Instance.CurrentPhase.Start();
+			TourismPhase.Start();
 			
-			Debug.LogWarning("[SpaceTourism] Advanced from phase " + GetType().Name + " to " + TourismContractManager.Instance.CurrentPhase.GetType().Name);
+			Debug.LogWarning("[SpaceTourism] Advanced to tourism phase " + TourismContractManager.Instance.CurrentPhase.GetType().Name);
 		}
 		
-		public void Save(ConfigNode node)
+		private static TourismPhase ActivateNextPhase()
 		{
-			contractMaxCounts.Save(node.AddNode("MAXCOUNTS"));
-			node.AddValue("skipTransition", skipTransition.ToString());
+			Type backupNextPhase = Type.GetType(nextPhase.FullName); // Create a backup because the value will change during the process
+			
+			Activator.CreateInstance(backupNextPhase); // Add the new infos ontop of the old ones
+			
+			// Remove duplicates
+			foreach (var contractInfo in ContractInfos.ConvertAll(info => info))
+			{
+				if (ContractInfos.FindAll(info => info.Type == contractInfo.Type).Count > 1)
+					ContractInfos.Remove(contractInfo);
+			}
+			
+			// Withdraw all remaining surplus contracts from the old phase
+			foreach (var contractInfo in ContractInfos)
+				contractInfo.WithdrawSurplusContracts();
+			
+			// Redo the creation process from scratch to get a new clean contract info list
+			ContractInfos.Clear();
+			return (TourismPhase)Activator.CreateInstance(backupNextPhase);
+		}
+		
+		public static void Save(ConfigNode node)
+		{
+			var nodeMaxCounts = node.AddNode("MAXCOUNTS");
+			
+			foreach (var contractInfo in ContractInfos)
+				contractInfo.SaveInfo(nodeMaxCounts);
+			
+			node.AddValue("skipTransition", skipTransition);
 			node.AddValue("nextPhase", nextPhase.Name);
 			
-			OnSave(node);
-			Destroy();
+			TourismContractManager.Instance.CurrentPhase.OnSave(node);
 		}
 		
-		public void Load(ConfigNode node)
+		public static void Load(ConfigNode node)
 		{
-			contractMaxCounts.Load(node.GetNode("MAXCOUNTS"));
+			var valueList = node.GetNode("MAXCOUNTS").values;
+			
+			ContractInfos.Clear();
+			foreach (ConfigNode.Value value in valueList)
+				ContractInfos.Add(new ContractInfo(value));
+				
 			skipTransition = bool.Parse(node.GetValue("skipTransition"));
 			
 			var nextPhaseName = node.GetValue("nextPhase");
 			nextPhase = Globals.PhaseTypes.Find(type => type.Name == nextPhaseName);
 			
-			OnLoad(node);
+			TourismContractManager.Instance.CurrentPhase.OnLoad(node);
 		}
 		
 		protected virtual void OnSave(ConfigNode node)
@@ -353,11 +226,6 @@ namespace SpaceTourism
 		
 		protected virtual void OnLoad(ConfigNode node)
 		{
-		}
-		
-		protected virtual void OnAwake()
-		{
-			Debug.LogError("[SpaceTourism] OnAwake()-Method not implemented in: " + GetType().Name);
 		}
 		
 		protected virtual void OnStart()

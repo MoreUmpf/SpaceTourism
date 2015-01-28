@@ -64,11 +64,19 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>().Count() >= 
-			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<SubOrbitalFlight>(false))
+			var contractInfo = TourismPhase.ContractInfos.Find(info => info.Type == typeof(SubOrbitalFlight));
+			
+			if (contractInfo == null)
 				return false;
 			
-        	UnityEngine.Random.seed = MissionSeed;
+			var currentContracts = ContractSystem.Instance.GetCurrentContracts<SubOrbitalFlight>();
+			
+			if (currentContracts.Length >= contractInfo.OverallCount)
+				return false;
+			
+			if (currentContracts.Count(contract => contract.prestige == prestige) >= contractInfo.protoMaxCounts[prestige])
+				return false;
+			
         	numberOfKerbals = (int)Math.Round(UnityEngine.Random.Range(1f, 2.6f));
         	minApA = Math.Round(UnityEngine.Random.Range(100000f, 150000f));
         	maxApA = minApA + 5000;
@@ -269,8 +277,7 @@ namespace SpaceTourism.Contracts
 
         public override bool MeetRequirements()
         {
-        	if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<SubOrbitalFlight>(false) > 0 && 
-        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+        	if (ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
         		return true;
         	return false;
         }

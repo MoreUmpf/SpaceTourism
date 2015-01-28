@@ -34,6 +34,7 @@ namespace SpaceTourism
 			}
 			set
 			{
+				TourismPhase.Destroy();
 				currentPhase = value;
 			}
 		}
@@ -51,38 +52,34 @@ namespace SpaceTourism
 		bool drawTouristList = true;
 		
 		List<ProtoVessel> existingHotels = new List<ProtoVessel>();
-
-		~TourismContractManager()
-		{
-			OnDestroy();
-		}
 		
 		public override void OnAwake()
-		{
+		{	
 			Instance = this;
-			
-			GameEvents.Contract.onCompleted.Add(new EventData<Contract>.OnEvent(OnContractCompleted));
-			GameEvents.onGUIMissionControlSpawn.Add(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Add(new EventVoid.OnEvent(OnMCDespawn));
+
+			GameEvents.Contract.onCompleted.Add(OnContractCompleted);
+			GameEvents.onGUIMissionControlSpawn.Add(OnMCSpawn);
+        	GameEvents.onGUIMissionControlDespawn.Add(OnMCDespawn);
         	
 			Debug.Log("[SpaceTourism] Contract Manager initialized");
 		}
 
 		private void OnDestroy()
 		{
-			GameEvents.Contract.onCompleted.Remove(new EventData<Contract>.OnEvent(OnContractCompleted));
-			GameEvents.onGUIMissionControlSpawn.Remove(new EventVoid.OnEvent(OnMCSpawn));
-        	GameEvents.onGUIMissionControlDespawn.Remove(new EventVoid.OnEvent(OnMCDespawn));
+			GameEvents.Contract.onCompleted.Remove(OnContractCompleted);
+			GameEvents.onGUIMissionControlSpawn.Remove(OnMCSpawn);
+        	GameEvents.onGUIMissionControlDespawn.Remove(OnMCDespawn);
+        	
+        	TourismPhase.Destroy();
 			
 			Debug.Log("[SpaceTourism] Contract Manager destroyed");
 		}
 		
 		public override void OnSave(ConfigNode node)
 		{
-			Debug.Log("[SpaceTourism] Saving TourismContractManager to node: " + node.name);
 			var nodePhase = node.AddNode("PHASE");
 			nodePhase.AddValue("name", currentPhase.GetType().Name);
-			currentPhase.Save(nodePhase);
+			TourismPhase.Save(nodePhase);
 			
 			var nodeHotels = node.AddNode("HOTELS");
 			foreach (var hotel in existingHotels)
@@ -101,24 +98,29 @@ namespace SpaceTourism
 				
 				if (string.IsNullOrEmpty(phaseName))
 				{
-					currentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
+					CurrentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
 				}
 				else
 				{
-					currentPhase = (TourismPhase)Activator.CreateInstance(Globals.PhaseTypes.Find(type => type.Name == phaseName));
-					currentPhase.Load(nodePhase);
+					CurrentPhase = (TourismPhase)Activator.CreateInstance(Globals.PhaseTypes.Find(type => type.Name == phaseName));
+					TourismPhase.Load(nodePhase);
 				}
 			}
 			else
-				currentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
+				CurrentPhase = new TourismPhases.ZeroGFlights(); //TODO: Make configurable
 			
-			currentPhase.Start();
+			TourismPhase.Start();
 				
 			if (node.HasNode("HOTELS"))
 			{
 				foreach (var hotelID in node.GetNode("HOTELS").GetValues("hotel"))
 				{
-					existingHotels.Add(HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == hotelID));
+					var hotel = HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == hotelID);
+					
+					if (hotel == null)
+						Debug.Log("[SpaceTourism] Hotel with id: " + hotelID + " not found!");
+					else
+						existingHotels.Add(hotel);
 				}
 			}
 		}
@@ -135,16 +137,14 @@ namespace SpaceTourism
 		
 		private void OnContractCompleted(Contract contract)
 		{
-			Debug.Log("[SpaceTourism][ContractManager] Contract of type " + contract.GetType() + " has been completed!");
+			Debug.Log("[SpaceTourism][ContractManager] Contract of type " + contract.GetType().Name + " has been completed!");
 			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract))
 			{
 				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
-				TourismEvents.onStationCompleted.Fire(FlightGlobals.ActiveVessel.protoVessel);
 			}
 			else if (contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
 			{
 				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
-				TourismEvents.onBaseCompleted.Fire(FlightGlobals.ActiveVessel.protoVessel);
 			}
 		}
 		
@@ -154,9 +154,9 @@ namespace SpaceTourism
 			var upgradedStations = basicStations.FindAll(vessel => vessel.protoPartSnapshots.Any(part => part.modules.Any(module => module.moduleName == "TourismModule")));
 			
 			if (upgradedStations.Count == 0)
-				return basicStations.ElementAtOrDefault(UnityEngine.Random.Range(0, basicStations.Count - 1));
+				return basicStations.ElementAtOrDefault(UnityEngine.Random.Range(0, basicStations.Count));
 			
-			return upgradedStations.ElementAtOrDefault(UnityEngine.Random.Range(0, upgradedStations.Count - 1));
+			return upgradedStations.ElementAtOrDefault(UnityEngine.Random.Range(0, upgradedStations.Count));
 		}
 		
 		private bool VesselMeetsRequirements(ProtoVessel protoVessel, CelestialBody body, Vessel.Situations situation)
@@ -164,6 +164,8 @@ namespace SpaceTourism
 			bool vesselHasAntenna = false;
 			bool vesselHasPowerGen = false;
 			bool vesselHasDockingPort = false;
+			
+			Debug.Log("[SpaceTourism] Checking hotel: body: " + FlightGlobals.Bodies[protoVessel.orbitSnapShot.ReferenceBodyIndex] + " sit: " + protoVessel.situation);
 			
 			if (FlightGlobals.Bodies[protoVessel.orbitSnapShot.ReferenceBodyIndex] == body && protoVessel.situation == situation)
 			{
@@ -181,6 +183,7 @@ namespace SpaceTourism
 				}
 			}
 			
+			Debug.Log("[SpaceTourism] Check failed!");
 			return false;
 		}
     }

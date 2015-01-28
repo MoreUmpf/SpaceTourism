@@ -13,7 +13,7 @@ using SpaceTourism.Contracts.Parameters;
  
 namespace SpaceTourism.Contracts
 {
-	public class UpgradeHotel : Contract, ITourismContract
+	public class UpgradeHotel : Contract, ITourismContract //TODO: Make seperate contracts inheriting from this for different upgrades
 	{
 		public ProtoVessel TargetHotel
 		{
@@ -48,35 +48,43 @@ namespace SpaceTourism.Contracts
 
 		protected override bool Generate()
 		{
-			if (ContractSystem.Instance.GetCurrentContracts<UpgradeHotel>().Count() >= 
-			    TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<UpgradeHotel>(false))
+			var contractInfo = TourismPhase.ContractInfos.Find(info => info.Type == typeof(UpgradeHotel));
+			
+			if (contractInfo == null)
+				return false;
+			
+			var currentContracts = ContractSystem.Instance.GetCurrentContracts<UpgradeHotel>();
+			
+			if (currentContracts.Length >= contractInfo.OverallCount)
+				return false;
+			
+			if (currentContracts.Count(contract => contract.prestige == prestige) >= contractInfo.protoMaxCounts[prestige])
 				return false;
 			
 			var bodies = Contract.GetBodies_Reached(true, false);
         	if (bodies == null)
 				return false;
         	
-        	UnityEngine.Random.seed = MissionSeed;
-        	
-        	var targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count() - 1)];
+        	var targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count())];
         	
         	var targetSituation = Vessel.Situations.ORBITING;
-			if (UnityEngine.Random.Range(0, 1) == 1)
+        	if (contractInfo.Restriction == TourismPhase.ContractInfo.ContractRestriction.None)
 			{
-				targetSituation = Vessel.Situations.LANDED;
+        		if (UnityEngine.Random.Range(0, 2) == 1)
+					targetSituation = Vessel.Situations.LANDED;
 			}
+        	else if (contractInfo.Restriction == TourismPhase.ContractInfo.ContractRestriction.Landed)
+        		targetSituation = Vessel.Situations.LANDED;
         	
-			Debug.Log("[UpgradeHotel Generate] body: " + targetBody.name + ", situation: " + targetSituation.ToString().ToLower());
 			targetHotel = TourismContractManager.Instance.GetAvailableHotel(targetBody, targetSituation);
-			Debug.Log("[UpgradeHotel Generate] targetHotel retrieved!");
+			
 			if (targetHotel == null)
 				return false;
-			Debug.Log("[UpgradeHotel Generate] targetHotel: " + targetHotel.vesselName);
 			
-			switch (UnityEngine.Random.Range(0, 1))
+			switch (UnityEngine.Random.Range(0, 2))
 			{
 				case 0:	// Upgrade Kerbal capacity by 3-5 Kerbals
-					targetUpgrade = UnityEngine.Random.Range(3, 5);
+					targetUpgrade = UnityEngine.Random.Range(3, 6);
 					Debug.Log("[UpgradeHotel Generate] targetUpgrade: capacity: " + targetUpgrade);
 					break;
 				case 1:	// Upgrade Hotel with special parts
@@ -85,10 +93,15 @@ namespace SpaceTourism.Contracts
 					break;
 			}
 			
+			// Change the vessel type to the detected type
+			VesselType resultType = VesselType.Station;
 			if (targetHotel.landed)
-				targetHotel.vesselType = VesselType.Base;
-			else
-				targetHotel.vesselType = VesselType.Station;
+				resultType = VesselType.Base;
+			
+			var vesselRef = targetHotel.vesselRef;
+			targetHotel.vesselType = resultType;
+			if (vesselRef != null)
+				vesselRef.vesselType = resultType;
 
 			SetExpiry();
 			SetScience(0f, targetBody);
@@ -142,13 +155,11 @@ namespace SpaceTourism.Contracts
         
         protected override string GetSynopsys()
         {
-        	string upgrade;
+        	string upgrade = "with a space potato! (something went wrong here!)";
         	if (targetUpgrade.GetType() == typeof(int))
         		upgrade = "to hold " + targetUpgrade + " more Kerbals";
         	else if (targetUpgrade.GetType() == typeof(List<ProtoPartSnapshot>))
         		upgrade = "with following parts:";
-        	else
-        		upgrade = "with a space potato! (something went wrong here!)";
         	
         	return "Upgrade your " + FlightGlobals.Bodies[targetHotel.orbitSnapShot.ReferenceBodyIndex].name + "-" + targetHotel.vesselType + " '" + targetHotel.vesselName + "' " + upgrade;
         }
@@ -188,27 +199,29 @@ namespace SpaceTourism.Contracts
         {
         	if (node.HasValue("upgradeCapacity"))
         	{
-        		targetUpgrade = node.GetValue("upgradeCapacity");
+        		targetUpgrade = int.Parse(node.GetValue("upgradeCapacity"));
         		Debug.Log("[UpgradeHotel] Loaded upgradeCapacity: additional capacity: " + targetUpgrade);
         	}
         	else if (node.HasValue("upgradeParts"))
         	{
         		var upgradePartIDs = node.GetValues("upgradeParts");
+        		List<ProtoPartSnapshot> targetParts = new List<ProtoPartSnapshot>();
         		foreach (var ID in upgradePartIDs)
 	        	{
-        			(targetUpgrade as List<ProtoPartSnapshot>).Add(FlightGlobals.FindProtoPartByID(uint.Parse(ID)));
-        			Debug.Log("[UpgradeHotel] Loaded upgradePart: name: " + (targetUpgrade as List<ProtoPartSnapshot>).Last().partName + " ID: " + ID);
+        			targetParts.Add(FlightGlobals.FindProtoPartByID(uint.Parse(ID)));
+        			Debug.Log("[UpgradeHotel] Loaded upgradePart: name: " + targetParts.Last().partName + " ID: " + ID);
 	        	}
+        		targetUpgrade = targetParts;
         	}
         	
-        	targetHotel = HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == node.GetValue("targetHotel"));
+        	var hotelID = node.GetValue("targetHotel");
+        	targetHotel = HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == hotelID);
         	Debug.Log("[UpgradeHotel] Loaded targetHotel: ID: " + targetHotel.vesselID);
         }
 
         public override bool MeetRequirements()
         {
-			if (TourismContractManager.Instance.CurrentPhase.ContractMaxCounts.GetMaxCount<UpgradeHotel>(false) > 0 && 
-        	    ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
+			if (ProgressTracking.Instance.NodeComplete("Kerbin", "ReturnFromOrbit"))
         		return true;
         	return false;
         }

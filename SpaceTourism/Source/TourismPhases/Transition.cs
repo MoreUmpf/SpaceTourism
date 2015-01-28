@@ -15,23 +15,44 @@ namespace SpaceTourism.TourismPhases
 {
 	public class Transition : TourismPhase
 	{
-		Type lastPhase;
 		List<Type> contractsToComplete = new List<Type>();
 		int contractsCompleted;
 		
-		public Transition(Type last, Type next)
+		public Transition()
 		{
-			lastPhase = last;
-			nextPhase = next;
+			if (nextPhase == null)
+				return;
 			
-			MergeMaxCounts(last, next); // Set Transitions set of contracts to half the counts of the last and the next phase
-			contractsToComplete = contractMaxCounts.GetContractTypes();
+			int oldInfoCount = ContractInfos.Count; // Remember the old count of contract infos
+			Type backupNextPhase = Type.GetType(nextPhase.FullName); // Create a backup because the value will change during the process
+			Debug.Log("[SpaceTourism] Copied Type: " + nextPhase.Name + " to " + backupNextPhase.Name);
 			
-			Awake();
-		}
-		
-		protected override void OnAwake()
-		{
+			Activator.CreateInstance(backupNextPhase); // Let the next phase add all its infos to the list
+			
+			// Take all the new contract types from the new list by excluding the old ones
+			contractsToComplete = ContractInfos.ConvertAll(contractInfo => contractInfo.Type);
+			contractsToComplete.RemoveRange(0, oldInfoCount);
+			
+			// Remove duplicates
+			foreach (var contractInfo in ContractInfos.ConvertAll(info => info))
+			{
+				if (ContractInfos.FindAll(info => info.Type == contractInfo.Type).Count > 1)
+					ContractInfos.Remove(contractInfo);
+			}
+			
+			// Apply a modifier to all contract counts in the list so the counts will be: half last phase, half next phase contracts (smooth transition between tourism phases)
+			foreach (var contractInfo in ContractInfos)
+			{
+				foreach (var prestige in (Contract.ContractPrestige[])Enum.GetValues(typeof(Contract.ContractPrestige)))
+				{
+					contractInfo.protoMaxCounts[prestige] = (int)Math.Round((double)contractInfo.protoMaxCounts[prestige] * 0.5d); //TODO: Make modifier configurable
+				}
+				contractInfo.OverallCount =  (int)Math.Round((double)contractInfo.OverallCount * 0.5d);
+				
+				contractInfo.WithdrawSurplusContracts();
+			}
+			
+			nextPhase = backupNextPhase;
 			skipTransition = true;
 		}
 		
@@ -47,14 +68,12 @@ namespace SpaceTourism.TourismPhases
 		
 		protected override void OnLoad(ConfigNode node)
 		{
-			var lastPhaseName = node.GetValue("lastPhase");
-			lastPhase = Globals.PhaseTypes.Find(type => type.Name == lastPhaseName);
-			
 			var contractNames = node.GetValue("contractsToComplete").Split(", ".ToCharArray());
 			
 			foreach (var name in contractNames)
 			{
-				contractsToComplete.Add(Globals.ContractTypes.Find(type => type.Name == name));
+				if (!string.IsNullOrEmpty(name))
+					contractsToComplete.Add(Globals.ContractTypes.Find(type => type.Name == name));
 			}
 			
 			contractsCompleted = int.Parse(node.GetValue("contractsCompleted"));
@@ -62,8 +81,6 @@ namespace SpaceTourism.TourismPhases
 		
 		protected override void OnSave(ConfigNode node)
 		{
-			node.AddValue("lastPhase", lastPhase.Name);
-			
 			string complete = string.Empty;
 			bool seperator = false;
 			
@@ -78,14 +95,6 @@ namespace SpaceTourism.TourismPhases
 			
 			node.AddValue("contractsToComplete", complete);
 			node.AddValue("contractsCompleted", contractsCompleted);
-		}
-		
-		private void MergeMaxCounts(params Type[] phases)
-		{
-			foreach (var phase in phases)
-			{
-				contractMaxCounts.Add(ProtoList(phase), 0.5); //TODO: Make modifier configurable
-			}
 		}
 		
 		private void OnContractCompleted(Contract contract)
