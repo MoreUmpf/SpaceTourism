@@ -51,13 +51,14 @@ namespace SpaceTourism
 		
 		bool drawTouristList = true;
 		
-		List<ProtoVessel> existingHotels = new List<ProtoVessel>();
+		List<Hotel> existingHotels = new List<Hotel>();
 		
 		public override void OnAwake()
 		{	
 			Instance = this;
 
 			GameEvents.Contract.onCompleted.Add(OnContractCompleted);
+			GameEvents.onVesselRename.Add(OnVesselRename);
 			GameEvents.onGUIMissionControlSpawn.Add(OnMCSpawn);
         	GameEvents.onGUIMissionControlDespawn.Add(OnMCDespawn);
         	
@@ -67,6 +68,7 @@ namespace SpaceTourism
 		private void OnDestroy()
 		{
 			GameEvents.Contract.onCompleted.Remove(OnContractCompleted);
+			GameEvents.onVesselRename.Remove(OnVesselRename);
 			GameEvents.onGUIMissionControlSpawn.Remove(OnMCSpawn);
         	GameEvents.onGUIMissionControlDespawn.Remove(OnMCDespawn);
         	
@@ -85,7 +87,7 @@ namespace SpaceTourism
 			foreach (var hotel in existingHotels)
 			{
 				if (hotel != null)
-					nodeHotels.AddValue("hotel", hotel.vesselID);
+					hotel.Save(nodeHotels);
 			}
 		}
 		
@@ -113,14 +115,13 @@ namespace SpaceTourism
 				
 			if (node.HasNode("HOTELS"))
 			{
-				foreach (var hotelID in node.GetNode("HOTELS").GetValues("hotel"))
+				var values = node.GetNode("HOTELS").values;
+				foreach (ConfigNode.Value value in values)
 				{
-					var hotel = HighLogic.CurrentGame.flightState.protoVessels.Find(pvessel => pvessel.vesselID.ToString() == hotelID);
+					var result = Hotel.Load(value);
 					
-					if (hotel == null)
-						Debug.Log("[SpaceTourism] Hotel with id: " + hotelID + " not found!");
-					else
-						existingHotels.Add(hotel);
+					if (result != null)
+						existingHotels.Add(result);
 				}
 			}
 		}
@@ -137,21 +138,55 @@ namespace SpaceTourism
 		
 		private void OnContractCompleted(Contract contract)
 		{
-			Debug.Log("[SpaceTourism][ContractManager] Contract of type " + contract.GetType().Name + " has been completed!");
 			if (contract.GetType() == typeof(FinePrint.Contracts.StationContract))
 			{
-				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
+				existingHotels.Add(new Hotel(FlightGlobals.ActiveVessel.protoVessel));
 			}
 			else if (contract.GetType() == typeof(FinePrint.Contracts.BaseContract))
 			{
-				existingHotels.Add(FlightGlobals.ActiveVessel.protoVessel);
+				existingHotels.Add(new Hotel(FlightGlobals.ActiveVessel.protoVessel));
 			}
+		}
+		
+		private void OnVesselRename(GameEvents.HostedFromToAction<Vessel, string> action) // Also triggered when vessel type changed
+		{
+			var existingHotel = existingHotels.Find(hotel => hotel.ProtoVesselRef == action.host);
+			
+			if (existingHotel == null)
+			{
+				if (action.host.vesselType == VesselType.Base || action.host.vesselType == VesselType.Station)
+					existingHotels.Add(new Hotel(action.host));
+			}
+			else
+			{
+				if (action.host.vesselType != VesselType.Base && action.host.vesselType != VesselType.Station)
+					existingHotels.Remove(existingHotel);
+			}
+		}
+		
+		public ProtoVessel GetAvailableHotel(List<CelestialBody> bodies, TourismPhase.ContractInfo.ContractRestriction restriction) //TODO: Add support for floating bases (splashed)
+		{
+        	if (bodies == null)
+				return null;
+        	
+        	var targetBody = bodies[UnityEngine.Random.Range(0, bodies.Count())];
+        	
+        	var targetSituation = Vessel.Situations.ORBITING;
+        	if (restriction == TourismPhase.ContractInfo.ContractRestriction.None)
+			{
+        		if (UnityEngine.Random.Range(0, 2) == 1)
+					targetSituation = Vessel.Situations.LANDED;
+			}
+        	else if (restriction == TourismPhase.ContractInfo.ContractRestriction.Landed)
+        		targetSituation = Vessel.Situations.LANDED;
+        	
+        	return GetAvailableHotel(targetBody, targetSituation);
 		}
 		
 		public ProtoVessel GetAvailableHotel(CelestialBody body, Vessel.Situations situation)
 		{
-			var basicStations = existingHotels.FindAll(vessel => VesselMeetsRequirements(vessel, body, situation));
-			var upgradedStations = basicStations.FindAll(vessel => vessel.protoPartSnapshots.Any(part => part.modules.Any(module => module.moduleName == "TourismModule")));
+			var basicHotel = existingHotels.FindAll(vessel => VesselMeetsRequirements(vessel, body, situation));
+			var upgradedHotel = basicHotel.FindAll(vessel => vessel.protoPartSnapshots.Any(part => part.modules.Any(module => module.moduleName == "TourismModule")));
 			
 			if (upgradedStations.Count == 0)
 				return basicStations.ElementAtOrDefault(UnityEngine.Random.Range(0, basicStations.Count));
@@ -164,8 +199,6 @@ namespace SpaceTourism
 			bool vesselHasAntenna = false;
 			bool vesselHasPowerGen = false;
 			bool vesselHasDockingPort = false;
-			
-			Debug.Log("[SpaceTourism] Checking hotel: body: " + FlightGlobals.Bodies[protoVessel.orbitSnapShot.ReferenceBodyIndex] + " sit: " + protoVessel.situation);
 			
 			if (FlightGlobals.Bodies[protoVessel.orbitSnapShot.ReferenceBodyIndex] == body && protoVessel.situation == situation)
 			{
@@ -183,7 +216,6 @@ namespace SpaceTourism
 				}
 			}
 			
-			Debug.Log("[SpaceTourism] Check failed!");
 			return false;
 		}
     }
